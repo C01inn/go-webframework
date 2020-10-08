@@ -20,12 +20,17 @@ type req struct {
 	method string
 	route  string
 	params map[string]string
+	body   string
 }
 
 type urlResp struct {
 	body        string
 	contentType string
 	filename    string
+}
+
+type json_body struct {
+	Test string
 }
 
 func AppConstructor(ap app) app {
@@ -46,6 +51,7 @@ func AppConstructor(ap app) app {
 					method: r.Method,
 					route:  r.URL.Path,
 					params: url_params,
+					body:   "",
 				}
 
 				resp := toDo(requestObj)
@@ -77,6 +83,13 @@ func AppConstructor(ap app) app {
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 
+				// get http body
+				bodyBytes, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
+				bodyString := string(bodyBytes)
+
 				url_params := make(map[string]string)
 
 				// addd url param key and values to map
@@ -88,6 +101,7 @@ func AppConstructor(ap app) app {
 					method: r.Method,
 					route:  r.URL.Path,
 					params: url_params,
+					body:   bodyString,
 				}
 
 				resp := toDo(requestObj)
@@ -237,6 +251,7 @@ func main() {
 	app := Server()
 	// routes
 	app.post("/home", func(req req) urlResp {
+		fmt.Println(req.body)
 
 		return sendFile("./img.jpg")
 	})
