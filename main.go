@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,7 +8,6 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
-	"time"
 )
 
 type app struct {
@@ -27,6 +25,7 @@ type req struct {
 type urlResp struct {
 	body        string
 	contentType string
+	filename    string
 }
 
 func AppConstructor(ap app) app {
@@ -61,12 +60,8 @@ func AppConstructor(ap app) app {
 				} else if resp.contentType == "file" {
 					http.ServeFile(w, r, resp.body)
 				} else if resp.contentType == "download" {
-					data, err := ioutil.ReadFile(resp.body)
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					http.ServeContent(w, r, "myfile", time.Now(), bytes.NewReader(data))
+					w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+					http.ServeFile(w, r, resp.body)
 				}
 
 			} else {
@@ -107,13 +102,8 @@ func AppConstructor(ap app) app {
 				} else if resp.contentType == "file" {
 					http.ServeFile(w, r, resp.body)
 				} else if resp.contentType == "download" {
-
-					data, err := ioutil.ReadFile(resp.body)
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					http.ServeContent(w, r, "myfile", time.Now(), bytes.NewReader(data))
+					w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+					http.ServeFile(w, r, resp.body)
 				}
 			} else {
 				fmt.Fprintf(w, "Method not allowed")
@@ -149,6 +139,7 @@ func renderHtml(filepath string) urlResp {
 
 	return_value := urlResp{
 		body:        string(html),
+		filename:    "",
 		contentType: "html",
 	}
 
@@ -158,6 +149,7 @@ func renderHtml(filepath string) urlResp {
 func sendStr(bodyu string) urlResp {
 	return_value := urlResp{
 		body:        bodyu,
+		filename:    "",
 		contentType: "html",
 	}
 	return return_value
@@ -172,6 +164,7 @@ func sendJson(bodyu interface{}) urlResp {
 
 		return_value := urlResp{
 			body:        real_body,
+			filename:    "",
 			contentType: "json",
 		}
 
@@ -185,6 +178,7 @@ func sendJson(bodyu interface{}) urlResp {
 		}
 		return_value := urlResp{
 			body:        string(real_body),
+			filename:    "",
 			contentType: "json",
 		}
 
@@ -198,6 +192,7 @@ func sendJson(bodyu interface{}) urlResp {
 
 		return_value := urlResp{
 			body:        string(real_body),
+			filename:    "",
 			contentType: "json",
 		}
 		return return_value
@@ -210,26 +205,29 @@ func sendJson(bodyu interface{}) urlResp {
 
 		return_value := urlResp{
 			body:        string(real_body),
+			filename:    "",
 			contentType: "json",
 		}
 
 		return return_value
 
 	}
-	return urlResp{body: "other", contentType: "json"}
+	return urlResp{body: "other", filename: "", contentType: "json"}
 }
 
 func sendFile(filepath string) urlResp {
 	return_data := urlResp{
 		body:        filepath,
+		filename:    "",
 		contentType: "file",
 	}
 	return return_data
 }
 
-func downloadFile(filepath string) urlResp {
+func downloadFile(filepath string, filenamee string) urlResp {
 	return_data := urlResp{
 		body:        filepath,
+		filename:    filenamee,
 		contentType: "download",
 	}
 	return return_data
@@ -264,7 +262,7 @@ func main() {
 
 		fmt.Println(req.params)
 
-		return sendFile("./img.jpg")
+		return downloadFile("./img.jpg", "myimage11.jpg")
 	})
 
 	app.listen(8090)
