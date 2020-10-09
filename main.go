@@ -224,8 +224,22 @@ func sendJson(bodyu interface{}) urlResp {
 		}
 
 		return return_value
+	} else if reflect.TypeOf(bodyu).Kind() == reflect.Struct {
+		json_data, err := json.Marshal(bodyu)
 
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(string(json_data))
+		return_value := urlResp{
+			body:        string(json_data),
+			filename:    "",
+			contentType: "json",
+		}
+
+		return return_value
 	}
+
 	return urlResp{body: "other", filename: "", contentType: "json"}
 }
 
@@ -247,6 +261,12 @@ func downloadFile(filepath string, filenamee string) urlResp {
 	return return_data
 }
 
+type TestStruct struct {
+	Name    string
+	Country string
+	Days    map[string]int
+}
+
 func main() {
 	app := Server()
 	// routes
@@ -258,16 +278,20 @@ func main() {
 
 	app.get("/", func(req req) urlResp {
 
+		fmt.Println(req.params)
+
 		return renderHtml("./index.html")
 	})
 
 	app.get("/about", func(req req) urlResp {
 
-		my_mape := make(map[string]int)
-		my_mape["k1"] = 8
-		my_mape["k2"] = 0
+		/* mymap := make([]map[string][]int)
+		mymap["key1"] = []int{1, 2, 3}
+		fmt.Println(reflect.TypeOf(mymap).Kind())
 
-		return sendJson(my_mape)
+		return sendJson(mymap)*/
+		return sendStr("ss")
+
 	})
 
 	app.get("/s", func(req req) urlResp {
