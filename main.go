@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 type app struct {
@@ -29,45 +30,124 @@ type urlResp struct {
 	filename    string
 }
 
-type json_body struct {
-	Test string
+var allRoutes []string
+var routeFunc map[string]func(req req) urlResp
+
+func RemoveIndex(s []string, index int) []string {
+	return append(s[:index], s[index+1:]...)
+}
+
+func checkRouteParams(route string) (bool, string) {
+
+	for _, jk := range allRoutes {
+		if strings.Contains(jk, "{") == true && strings.Contains(jk, "}") == true {
+
+			routeValues := strings.Split(route, "/")
+			routeValues = RemoveIndex(routeValues, 0)
+
+			ll := strings.Split(jk, "/")
+			ll = RemoveIndex(ll, 0)
+
+			if len(routeValues) == len(ll) && routeValues[0] == ll[0] {
+				return true, jk
+
+			} else {
+				continue
+			}
+
+		}
+
+	}
+	return false, ""
 }
 
 func AppConstructor(ap app) app {
 
+	routeFunc = make(map[string]func(req req) urlResp)
+
 	// handle get request
 	ap.get = func(route string, toDo func(req req) urlResp) {
+		allRoutes = append(allRoutes, route)
+		routeFunc[route] = toDo
+
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 
-				url_params := make(map[string]string)
+				if route != r.URL.Path {
+					// check if its a route with a parameter
+					parameterRoute, hashRoute := checkRouteParams(r.URL.Path)
+					if parameterRoute == true {
 
-				// add url param key and values to map
-				for k, v := range r.URL.Query() {
-					url_params[k] = v[0]
-				}
+						url_params := make(map[string]string)
 
-				requestObj := req{
-					method: r.Method,
-					route:  r.URL.Path,
-					params: url_params,
-					body:   "",
-				}
+						// add url param key and values to map
+						for k, v := range r.URL.Query() {
+							url_params[k] = v[0]
+						}
 
-				resp := toDo(requestObj)
-				// check if user is returning html
-				if resp.contentType == "html" {
-					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+						requestObj := req{
+							method: r.Method,
+							route:  r.URL.Path,
+							params: url_params,
+							body:   "",
+						}
+						fmt.Println(hashRoute)
+						fmt.Println("======================")
+						resp := routeFunc[hashRoute](requestObj)
+						fmt.Println(resp.body)
 
-					fmt.Fprint(w, resp.body)
-				} else if resp.contentType == "json" {
-					w.Header().Set("Content-Type", "application/json")
-					fmt.Fprint(w, resp.body)
-				} else if resp.contentType == "file" {
-					http.ServeFile(w, r, resp.body)
-				} else if resp.contentType == "download" {
-					w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
-					http.ServeFile(w, r, resp.body)
+						// check if user is returning html
+						if resp.contentType == "html" {
+							w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+							fmt.Fprint(w, resp.body)
+						} else if resp.contentType == "json" {
+							w.Header().Set("Content-Type", "application/json")
+							fmt.Fprint(w, resp.body)
+						} else if resp.contentType == "file" {
+							http.ServeFile(w, r, resp.body)
+						} else if resp.contentType == "download" {
+							w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+							http.ServeFile(w, r, resp.body)
+						}
+
+					} else {
+						// if not return 404
+						fmt.Fprintf(w, "404 Not Found")
+						return
+					}
+
+				} else {
+					url_params := make(map[string]string)
+
+					// add url param key and values to map
+					for k, v := range r.URL.Query() {
+						url_params[k] = v[0]
+					}
+
+					requestObj := req{
+						method: r.Method,
+						route:  r.URL.Path,
+						params: url_params,
+						body:   "",
+					}
+
+					resp := toDo(requestObj)
+
+					// check if user is returning html
+					if resp.contentType == "html" {
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "json" {
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "file" {
+						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "download" {
+						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+						http.ServeFile(w, r, resp.body)
+					}
 				}
 
 			} else {
@@ -80,6 +160,9 @@ func AppConstructor(ap app) app {
 
 	// handle post request
 	ap.post = func(route string, toDo func(req req) urlResp) {
+		allRoutes = append(allRoutes, route)
+		routeFunc[route] = toDo
+
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 
@@ -261,10 +344,20 @@ func downloadFile(filepath string, filenamee string) urlResp {
 	return return_data
 }
 
-type TestStruct struct {
-	Name    string
-	Country string
-	Days    map[string]int
+func getCode(r *http.Request, defaultCode int) (int, string) {
+	p := strings.Split(r.URL.Path, "/")
+	if len(p) == 1 {
+		return defaultCode, p[0]
+	} else if len(p) > 1 {
+		code, err := strconv.Atoi(p[0])
+		if err == nil {
+			return code, p[1]
+		} else {
+			return defaultCode, p[1]
+		}
+	} else {
+		return defaultCode, ""
+	}
 }
 
 func main() {
@@ -277,13 +370,13 @@ func main() {
 	})
 
 	app.get("/", func(req req) urlResp {
-
+		fmt.Println(routeFunc)
 		fmt.Println(req.params)
 
 		return renderHtml("./index.html")
 	})
 
-	app.get("/about", func(req req) urlResp {
+	app.get("/about/{id}/{type}", func(req req) urlResp {
 
 		/* mymap := make([]map[string][]int)
 		mymap["key1"] = []int{1, 2, 3}
@@ -298,11 +391,16 @@ func main() {
 
 		my_mape := make(map[string]int)
 		my_mape["k1"] = 8
-
+		fmt.Println("=========")
 		fmt.Println(req.params)
 
 		return downloadFile("./img.jpg", "myimage11.jpg")
 	})
 
+	app.get("/videos/{id}", func(req req) urlResp {
+		return sendStr("This is the videos page")
+	})
+
 	app.listen(8090)
+
 }
