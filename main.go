@@ -31,22 +31,23 @@ type urlResp struct {
 	filename    string
 }
 
-var allRoutes []string
+var allRoutes [][]string
 var routeFunc map[string]func(req req) urlResp
 
 func RemoveIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
 }
 
-func checkRouteParams(route string) (bool, string, map[string]string) {
+// function that returns if route is paramter, route, route method, and route function
+func checkRouteParams(route string) (bool, string, string, map[string]string) {
 
 	for _, jk := range allRoutes {
-		if strings.Contains(jk, "{") == true && strings.Contains(jk, "}") == true {
+		if strings.Contains(jk[0], "{") == true && strings.Contains(jk[0], "}") == true {
 
 			routeValues := strings.Split(route, "/")
 			routeValues = RemoveIndex(routeValues, 0)
 
-			ll := strings.Split(jk, "/")
+			ll := strings.Split(jk[0], "/")
 			ll = RemoveIndex(ll, 0)
 
 			if len(routeValues) == len(ll) && routeValues[0] == ll[0] {
@@ -61,7 +62,7 @@ func checkRouteParams(route string) (bool, string, map[string]string) {
 						params_map[key2] = routeValues[idx]
 					}
 				}
-				return true, jk, params_map
+				return true, jk[0], jk[1], params_map
 
 			} else {
 				continue
@@ -70,7 +71,7 @@ func checkRouteParams(route string) (bool, string, map[string]string) {
 		}
 
 	}
-	return false, "", make(map[string]string)
+	return false, "", "", make(map[string]string)
 }
 
 func AppConstructor(ap app) app {
@@ -79,18 +80,38 @@ func AppConstructor(ap app) app {
 
 	// handle get request
 	ap.get = func(route string, toDo func(req req) urlResp) {
-		allRoutes = append(allRoutes, route)
+
+		// make sure route starts with a slash
+		if strings.HasPrefix(route, "/") {
+		} else {
+			panic("Route Must Start With a /")
+			return
+		}
+
+		// check if route already exists
+		for _, ccc := range allRoutes {
+			if ccc[0] == route {
+				panic("Route Already Exists")
+				return
+			} else {
+				continue
+			}
+		}
+
+		var routeSlice []string
+		routeSlice = append(routeSlice, route)
+		routeSlice = append(routeSlice, "GET")
+		allRoutes = append(allRoutes, routeSlice)
+
 		routeFunc[route] = toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
-			fmt.Println(r.URL.Path)
-			if r.Method == http.MethodGet {
 
-				if route != r.URL.Path {
-					// check if its a route with a parameter
-					parameterRoute, hashRoute, url_vars := checkRouteParams(r.URL.Path)
-					if parameterRoute == true {
-
+			if route != r.URL.Path {
+				// check if its a route with a parameter
+				parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
+				if parameterRoute == true {
+					if routeMethod == r.Method && routeMethod == "GET" {
 						url_params := make(map[string]string)
 
 						// add url param key and values to map
@@ -122,68 +143,7 @@ func AppConstructor(ap app) app {
 							w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 							http.ServeFile(w, r, resp.body)
 						}
-
-					} else {
-						// if not return 404
-						fmt.Fprintf(w, "404 Not Found")
-						return
-					}
-
-				} else {
-					url_params := make(map[string]string)
-
-					// add url param key and values to map
-					for k, v := range r.URL.Query() {
-						url_params[k] = v[0]
-					}
-
-					requestObj := req{
-						method: r.Method,
-						route:  r.URL.Path,
-						params: url_params,
-						body:   "",
-					}
-
-					resp := toDo(requestObj)
-
-					// check if user is returning html
-					if resp.contentType == "html" {
-						w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-						fmt.Fprint(w, resp.body)
-					} else if resp.contentType == "json" {
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprint(w, resp.body)
-					} else if resp.contentType == "file" {
-						http.ServeFile(w, r, resp.body)
-					} else if resp.contentType == "download" {
-						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
-						http.ServeFile(w, r, resp.body)
-					}
-				}
-
-			} else {
-				fmt.Fprintf(w, "Method not allowed")
-			}
-
-		})
-
-	}
-
-	// handle post request
-	ap.post = func(route string, toDo func(req req) urlResp) {
-		allRoutes = append(allRoutes, route)
-		routeFunc[route] = toDo
-
-		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
-			fmt.Println(r.URL.Path + `        POST`)
-			if r.Method == http.MethodPost {
-				if route != r.URL.Path {
-					// check if its a route with a parameter
-					parameterRoute, hashRoute, url_vars := checkRouteParams(r.URL.Path)
-					if parameterRoute == true {
-
-						// get http body
+					} else if routeMethod == r.Method && routeMethod != "GET" {
 						bodyBytes, err := ioutil.ReadAll(r.Body)
 						if err != nil {
 							log.Fatal(err)
@@ -219,6 +179,136 @@ func AppConstructor(ap app) app {
 						} else if resp.contentType == "download" {
 							w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 							http.ServeFile(w, r, resp.body)
+						}
+
+					} else {
+						fmt.Fprintf(w, "Method wrong")
+						return
+					}
+
+				} else {
+					// if not return 404
+					fmt.Fprintf(w, "404 Not Found")
+					return
+				}
+
+			} else {
+				if r.Method == http.MethodGet {
+					url_params := make(map[string]string)
+
+					// add url param key and values to map
+					for k, v := range r.URL.Query() {
+						url_params[k] = v[0]
+					}
+
+					requestObj := req{
+						method: r.Method,
+						route:  r.URL.Path,
+						params: url_params,
+						body:   "",
+					}
+
+					resp := toDo(requestObj)
+
+					// check if user is returning html
+					if resp.contentType == "html" {
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "json" {
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "file" {
+						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "download" {
+						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+						http.ServeFile(w, r, resp.body)
+					}
+				} else {
+					fmt.Fprintf(w, "Method not allowed")
+				}
+
+			}
+
+		})
+
+	}
+
+	// handle post request
+	ap.post = func(route string, toDo func(req req) urlResp) {
+
+		if strings.HasPrefix(route, "/") {
+		} else {
+			panic("Route Must Start With a /")
+			return
+		}
+
+		// check if route already exists
+		for _, ccc := range allRoutes {
+			if ccc[0] == route {
+				panic("Route Already Exists")
+				return
+			} else {
+				continue
+			}
+		}
+
+		var routeSlice1 []string
+		routeSlice1 = append(routeSlice1, route)
+		routeSlice1 = append(routeSlice1, "POST")
+		allRoutes = append(allRoutes, routeSlice1)
+
+		routeFunc[route] = toDo
+
+		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+
+			if r.Method == http.MethodPost {
+				if route != r.URL.Path {
+					// check if its a route with a parameter
+					parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
+					if parameterRoute == true {
+						if routeMethod == r.Method {
+							// get http body
+							bodyBytes, err := ioutil.ReadAll(r.Body)
+							if err != nil {
+								log.Fatal(err)
+							}
+							bodyString := string(bodyBytes)
+
+							url_params := make(map[string]string)
+
+							// addd url param key and values to map
+							for k, v := range r.URL.Query() {
+								url_params[k] = v[0]
+							}
+
+							requestObj := req{
+								method: r.Method,
+								route:  r.URL.Path,
+								params: url_params,
+								body:   bodyString,
+								props:  url_vars,
+							}
+
+							resp := routeFunc[hashRoute](requestObj)
+							// check if user is returning html
+							if resp.contentType == "html" {
+								w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "json" {
+								w.Header().Set("Content-Type", "application/json")
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "file" {
+								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "download" {
+								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+								http.ServeFile(w, r, resp.body)
+							}
+						} else {
+							// if not return wront method
+							fmt.Fprintf(w, "Wrong Method")
+							return
 						}
 
 					} else {
@@ -272,9 +362,9 @@ func AppConstructor(ap app) app {
 	}
 
 	// listen on a port
-	ap.listen = func(port int) {
-		http.ListenAndServe(":"+strconv.Itoa(port), nil)
-		fmt.Println(fmt.Sprintf("Listening on port %s", strconv.Itoa(port)))
+	ap.listen = func(port2 int) {
+		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port2), nil)
+		fmt.Println("Listening on port " + strconv.Itoa(port2))
 	}
 
 	return ap
@@ -457,7 +547,8 @@ func main() {
 		return sendStr("This is the videos page " + id)
 	})
 	app.post("/img/{ids}", func(req req) urlResp {
-		return sendStr("ssss")
+
+		return sendStr("ssss " + req.props["ids"])
 	})
 
 	app.listen(8090)
