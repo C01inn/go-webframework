@@ -383,7 +383,9 @@ func AppConstructor(ap app) app {
 
 	// listen on a port
 	ap.listen = func(port2 int) {
+		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port2), nil)
+
 		fmt.Println("Listening on port " + strconv.Itoa(port2))
 	}
 
@@ -418,7 +420,7 @@ func renderHtml(filepath string, temp_data interface{}) urlResp {
 		}
 		return return_value
 	}
-	fmt.Println(`=============================================================================================================================`)
+
 	if reflect.TypeOf(temp_data).Kind() == reflect.Struct {
 		t, _ := template.ParseFiles(filepath)
 
