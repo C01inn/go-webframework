@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type app struct {
@@ -23,6 +24,8 @@ type req struct {
 	params map[string]string
 	body   string
 	props  map[string]string
+	w      http.ResponseWriter
+	r      *http.Request
 }
 
 type urlResp struct {
@@ -42,32 +45,36 @@ func RemoveIndex(s []string, index int) []string {
 func checkRouteParams(route string) (bool, string, string, map[string]string) {
 
 	for _, jk := range allRoutes {
-		if strings.Contains(jk[0], "{") == true && strings.Contains(jk[0], "}") == true {
+		if jk[0] == route {
+			return false, "", "", make(map[string]string)
+		} else {
+			if strings.Contains(jk[0], "{") == true && strings.Contains(jk[0], "}") == true {
 
-			routeValues := strings.Split(route, "/")
-			routeValues = RemoveIndex(routeValues, 0)
+				routeValues := strings.Split(route, "/")
+				routeValues = RemoveIndex(routeValues, 0)
 
-			ll := strings.Split(jk[0], "/")
-			ll = RemoveIndex(ll, 0)
+				ll := strings.Split(jk[0], "/")
+				ll = RemoveIndex(ll, 0)
 
-			if len(routeValues) == len(ll) && routeValues[0] == ll[0] {
+				if len(routeValues) == len(ll) && routeValues[0] == ll[0] {
 
-				// create hashmap of url parameters
+					// create hashmap of url parameters
 
-				params_map := make(map[string]string)
-				for idx, keyy := range ll {
-					if strings.HasPrefix(keyy, "{") && strings.HasSuffix(keyy, "}") {
-						key2 := strings.Replace(keyy, "{", "", 1)
-						key2 = strings.Replace(key2, "}", "", 1)
-						params_map[key2] = routeValues[idx]
+					params_map := make(map[string]string)
+					for idx, keyy := range ll {
+						if strings.HasPrefix(keyy, "{") && strings.HasSuffix(keyy, "}") {
+							key2 := strings.Replace(keyy, "{", "", 1)
+							key2 = strings.Replace(key2, "}", "", 1)
+							params_map[key2] = routeValues[idx]
+						}
 					}
+					return true, jk[0], jk[1], params_map
+
+				} else {
+					continue
 				}
-				return true, jk[0], jk[1], params_map
 
-			} else {
-				continue
 			}
-
 		}
 
 	}
@@ -125,6 +132,8 @@ func AppConstructor(ap app) app {
 							params: url_params,
 							body:   "",
 							props:  url_vars,
+							w:      w,
+							r:      r,
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -163,6 +172,8 @@ func AppConstructor(ap app) app {
 							params: url_params,
 							body:   bodyString,
 							props:  url_vars,
+							w:      w,
+							r:      r,
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -206,6 +217,8 @@ func AppConstructor(ap app) app {
 						route:  r.URL.Path,
 						params: url_params,
 						body:   "",
+						w:      w,
+						r:      r,
 					}
 
 					resp := toDo(requestObj)
@@ -288,6 +301,8 @@ func AppConstructor(ap app) app {
 								params: url_params,
 								body:   bodyString,
 								props:  url_vars,
+								w:      w,
+								r:      r,
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -336,6 +351,8 @@ func AppConstructor(ap app) app {
 						route:  r.URL.Path,
 						params: url_params,
 						body:   bodyString,
+						w:      w,
+						r:      r,
 					}
 
 					resp := toDo(requestObj)
@@ -513,6 +530,47 @@ func getCode(r *http.Request, defaultCode int) (int, string) {
 	}
 }
 
+type Cookie struct {
+	Name  string
+	Value string
+
+	Expires time.Time
+}
+
+func setCookie(request req, cookie_data Cookie) {
+
+	http_cookie := &http.Cookie{
+		Name:     cookie_data.Name,
+		Value:    cookie_data.Value,
+		Expires:  cookie_data.Expires,
+		HttpOnly: false,
+		Path:     "/",
+	}
+
+	http.SetCookie(request.w, http_cookie)
+}
+
+func getCookie(request req, name string) (string, error) {
+	c, err := request.r.Cookie(name)
+
+	if err != nil {
+		return "", err
+	}
+	return c.Value, nil
+}
+
+func removeCookie(request req, name string) {
+	http_cookie := &http.Cookie{
+		Name:     name,
+		Value:    "",
+		Expires:  time.Now().Add(time.Minute - (time.Second)*30),
+		HttpOnly: false,
+		Path:     "/",
+		MaxAge:   -1,
+	}
+	http.SetCookie(request.w, http_cookie)
+}
+
 func main() {
 	app := Server()
 	// routes
@@ -529,7 +587,12 @@ func main() {
 	})
 
 	app.get("/about/{id}/{type}", func(req req) urlResp {
-
+		cookie_val, err := getCookie(req, "cook1")
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println(cookie_val)
+		}
 		return sendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"])
 
 	})
@@ -544,9 +607,27 @@ func main() {
 
 	app.get("/videos/{id}", func(req req) urlResp {
 		id := req.props["id"]
+		removeCookie(req, "cook1")
+
 		return sendStr("This is the videos page " + id)
 	})
-	app.post("/img/{ids}", func(req req) urlResp {
+	app.get(`/videos/about`, func(req req) urlResp {
+
+		setCookie(req, Cookie{
+			Name:    "cook1",
+			Value:   "mycookeieval",
+			Expires: time.Now().Add(time.Hour + time.Hour),
+		})
+
+		return sendStr("video about page")
+	})
+
+	app.get("/img/{ids}", func(req req) urlResp {
+		setCookie(req, Cookie{
+			Name:    "cook1",
+			Value:   "changed-cookie",
+			Expires: time.Now().Add(time.Hour + time.Hour),
+		})
 
 		return sendStr("ssss " + req.props["ids"])
 	})
