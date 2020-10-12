@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"time"
 )
 
+// make structs uppercase so they get exported
 type app struct {
 	get    func(route string, toDo func(req req) urlResp)
 	post   func(route string, toDo func(req req) urlResp)
@@ -397,20 +400,58 @@ func Server() app {
 
 // render html template
 // returns text from html file
-func renderHtml(filepath string) urlResp {
-	html, err := ioutil.ReadFile(filepath)
+func renderHtml(filepath string, temp_data interface{}) urlResp {
+	if temp_data == nil {
+		t, _ := template.ParseFiles(filepath)
+		var tpl bytes.Buffer
 
-	if err != nil {
-		log.Fatal(err)
+		type templatedata struct{}
+		template_data := templatedata{}
+
+		t.Execute(&tpl, template_data)
+		html := tpl.String()
+
+		return_value := urlResp{
+			body:        string(html),
+			filename:    "",
+			contentType: "html",
+		}
+		return return_value
+	}
+	fmt.Println(`=============================================================================================================================`)
+	if reflect.TypeOf(temp_data).Kind() == reflect.Struct {
+		t, _ := template.ParseFiles(filepath)
+
+		var tpl bytes.Buffer
+		t.Execute(&tpl, temp_data)
+
+		html := tpl.String()
+
+		return_value := urlResp{
+			body:        string(html),
+			filename:    "",
+			contentType: "html",
+		}
+
+		return return_value
+	} else {
+		t, _ := template.ParseFiles(filepath)
+		var tpl bytes.Buffer
+
+		type templatedata struct{}
+		template_data := templatedata{}
+
+		t.Execute(&tpl, template_data)
+		html := tpl.String()
+
+		return_value := urlResp{
+			body:        string(html),
+			filename:    "",
+			contentType: "html",
+		}
+		return return_value
 	}
 
-	return_value := urlResp{
-		body:        string(html),
-		filename:    "",
-		contentType: "html",
-	}
-
-	return return_value
 }
 
 func sendStr(bodyu string) urlResp {
@@ -583,7 +624,7 @@ func main() {
 
 	app.get("/", func(req req) urlResp {
 
-		return renderHtml("./index.html")
+		return renderHtml("./templates/index.html", nil)
 	})
 
 	app.get("/about/{id}/{type}", func(req req) urlResp {
@@ -630,6 +671,24 @@ func main() {
 		})
 
 		return sendStr("ssss " + req.props["ids"])
+	})
+
+	app.get("/agg", func(req req) urlResp {
+
+		// make struct of data to pass to template
+		type newsAggPage struct {
+			Title string
+			News  string
+			Posts []string
+		}
+
+		data2 := newsAggPage{
+			Title: "My title",
+			News:  "Fake news!",
+			Posts: []string{"Post 1", "Post 2", "Post3"},
+		}
+
+		return renderHtml(`./templates/temp.html`, data2)
 	})
 
 	app.listen(8090)

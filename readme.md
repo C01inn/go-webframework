@@ -45,10 +45,30 @@ app.post("/", func(req, req) urlResp {
 
 ```
 app.get("/", func(req, req) urlResp {
-    return renderHtml(filepath)
+    return renderHtml(filepath, nil)
 })
 ```
-## Send Json Data
+
+### Html Templating
+#### Create a struct of your data and pass it to the Html Template
+#### If you wish to send no data simply pass a nil value
+```
+app.get("/", func(req req) urlResp {
+    // create a struct of data to pass to html
+    type mydata struct {
+        Title   string
+        Name    string
+    }
+    data := mydata{
+        Title: "My title",
+        Name: "My name",
+    }
+
+    return renderHtml(filepath, data)
+})
+```
+
+### Send Json Data
 ###### Use the sendJson() function to send json data. The function takes in a map, slice, array, or json string.
 ##
 ```
@@ -69,6 +89,7 @@ app.get("/", func(req, req) urlResp {
     return downloadFile(filepath, filename)
 })
 ```
+***
 
 
 
