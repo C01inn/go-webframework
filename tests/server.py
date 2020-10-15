@@ -10,8 +10,12 @@ def index():
 def vid(ids):
     return 'video: ' + ids
 
-@app.route('/vid/about')
-def vid_about():
-    return 'Video about page'
+@app.route('/vid/<idd>/<name>')
+def vid_about(idd, name):
+    return 'Video about page \n' + idd + '\n' + name
+
+@app.route('/vid/about/<idd>')
+def num22(idd):
+    return idd 
 
 app.run(debug=True, port=7777)

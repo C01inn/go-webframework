@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -22,13 +23,14 @@ type app struct {
 }
 
 type req struct {
-	method string
-	route  string
-	params map[string]string
-	body   string
-	props  map[string]string
-	w      http.ResponseWriter
-	r      *http.Request
+	method  string
+	route   string
+	params  map[string]string
+	body    string
+	props   map[string]string
+	w       http.ResponseWriter
+	r       *http.Request
+	getFile func(filename string) (multipart.File, *multipart.FileHeader, error)
 }
 
 type urlResp struct {
@@ -46,7 +48,7 @@ func RemoveIndex(s []string, index int) []string {
 
 // function that returns if route is paramter, route, route method, and route function
 func checkRouteParams(route string) (bool, string, string, map[string]string) {
-
+OUTER:
 	for _, jk := range allRoutes {
 		if jk[0] == route {
 			return false, "", "", make(map[string]string)
@@ -60,7 +62,34 @@ func checkRouteParams(route string) (bool, string, string, map[string]string) {
 				ll = RemoveIndex(ll, 0)
 
 				if len(routeValues) == len(ll) && routeValues[0] == ll[0] {
+					// check to see if it matches better with another route
 
+					matching_map := make(map[string]int)
+
+					for _, route1 := range allRoutes {
+
+						route1Values := strings.Split(route1[0], "/")
+						route1Values = RemoveIndex(route1Values, 0)
+						matching_score := 0
+						for _, cc := range routeValues {
+
+							for _, uu := range route1Values {
+
+								if uu == cc {
+									matching_score = matching_score + 1
+								}
+							}
+						}
+						matching_map[route1[0]] = matching_score
+
+					}
+					theRouteScore := matching_map[jk[0]]
+					for _, yy := range matching_map {
+
+						if yy > theRouteScore {
+							continue OUTER
+						}
+					}
 					// create hashmap of url parameters
 
 					params_map := make(map[string]string)
@@ -277,19 +306,12 @@ func AppConstructor(ap app) app {
 		routeFunc[route] = toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
-
 			if r.Method == http.MethodPost {
 				if route != r.URL.Path {
 					// check if its a route with a parameter
 					parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
 					if parameterRoute == true {
 						if routeMethod == r.Method {
-							// get http body
-							bodyBytes, err := ioutil.ReadAll(r.Body)
-							if err != nil {
-								log.Fatal(err)
-							}
-							bodyString := string(bodyBytes)
 
 							url_params := make(map[string]string)
 
@@ -298,6 +320,14 @@ func AppConstructor(ap app) app {
 								url_params[k] = v[0]
 							}
 
+							// get http body
+							bodyBytes, err := ioutil.ReadAll(r.Body)
+							if err != nil {
+								log.Fatal(err)
+							}
+							bodyString := string(bodyBytes)
+
+							// make request object
 							requestObj := req{
 								method: r.Method,
 								route:  r.URL.Path,
@@ -306,6 +336,10 @@ func AppConstructor(ap app) app {
 								props:  url_vars,
 								w:      w,
 								r:      r,
+								getFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+									file, header, err := r.FormFile(filename)
+									return file, header, err
+								},
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -335,6 +369,8 @@ func AppConstructor(ap app) app {
 						return
 					}
 				} else {
+					r.ParseMultipartForm(5 * 1024 * 1024)
+
 					// get http body
 					bodyBytes, err := ioutil.ReadAll(r.Body)
 					if err != nil {
@@ -356,6 +392,10 @@ func AppConstructor(ap app) app {
 						body:   bodyString,
 						w:      w,
 						r:      r,
+						getFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+							file, header, err := r.FormFile(filename)
+							return file, header, err
+						},
 					}
 
 					resp := toDo(requestObj)
@@ -619,8 +659,6 @@ func main() {
 	// routes
 	app.post("/home/{id}", func(req req) urlResp {
 
-		fmt.Println(req.body)
-		fmt.Println(req.props["id"])
 		return sendFile("./img.jpg")
 	})
 
@@ -633,10 +671,9 @@ func main() {
 		cookie_val, err := getCookie(req, "cook1")
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			fmt.Println(cookie_val)
 		}
-		return sendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"])
+
+		return sendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"] + "<br> " + cookie_val)
 
 	})
 
@@ -675,6 +712,14 @@ func main() {
 		return sendStr("ssss " + req.props["ids"])
 	})
 
+	app.get("/agg/{id}/{name}", func(req req) urlResp {
+		return sendStr(req.props["id"] + `  ` + req.props["name"])
+	})
+	app.get("/agg/videos/{id}", func(req req) urlResp {
+
+		return sendStr("image:   " + req.props["id"])
+	})
+
 	app.get("/agg", func(req req) urlResp {
 
 		// make struct of data to pass to template
@@ -685,12 +730,27 @@ func main() {
 		}
 
 		data2 := newsAggPage{
-			Title: "My title",
+			Title: "",
 			News:  "Fake news!",
 			Posts: []string{"Post 1", "Post 2", "Post3"},
 		}
 
 		return renderHtml(`./templates/temp.html`, data2)
+	})
+	app.get("/upload", func(req req) urlResp {
+		return renderHtml(`./templates/upload.html`, nil)
+	})
+	app.post("/file-up", func(req req) urlResp {
+
+		file, header, err := req.getFile("myfile")
+
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(header)
+		fmt.Println(file)
+
+		return sendStr("good")
 	})
 
 	app.listen(8090)
