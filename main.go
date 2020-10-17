@@ -90,6 +90,20 @@ OUTER:
 							continue OUTER
 						}
 					}
+
+					// check again
+					for idx8, jo := range routeValues {
+
+						if jo != ll[idx8] {
+							if strings.Contains(ll[idx8], "{") == false {
+								if strings.Contains(ll[idx8], "}") == false {
+									continue OUTER
+								}
+							}
+						}
+
+					}
+
 					// create hashmap of url parameters
 
 					params_map := make(map[string]string)
@@ -751,6 +765,17 @@ func main() {
 		fmt.Println(file)
 
 		return sendStr("good")
+	})
+
+	app.get(`/users/{id}`, func(req req) urlResp {
+		return sendStr("user: " + req.props["id"])
+	})
+
+	app.get(`/users/{id}/posts`, func(req req) urlResp {
+		return sendStr("user: " + req.props["id"] + " posts")
+	})
+	app.get(`/users/{id}/followers`, func(req req) urlResp {
+		return sendStr("user: " + req.props["id"] + ` followers`)
 	})
 
 	app.listen(8090)

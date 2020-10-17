@@ -1,6 +1,6 @@
-from flask import Flask
+from flask import Flask, render_template
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="tests/static")
 
 @app.route('/')
 def index():
@@ -16,6 +16,6 @@ def vid_about(idd, name):
 
 @app.route('/vid/about/<idd>')
 def num22(idd):
-    return idd 
+    return render_template("index.html")
 
 app.run(debug=True, port=7777)
