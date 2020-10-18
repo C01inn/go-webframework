@@ -1,4 +1,4 @@
-package main
+package swift
 
 import (
 	"bytes"
@@ -16,13 +16,13 @@ import (
 )
 
 // make structs uppercase so they get exported
-type app struct {
-	get    func(route string, toDo func(req req) urlResp)
-	post   func(route string, toDo func(req req) urlResp)
+type App struct {
+	get    func(route string, toDo func(req Req) UrlResp)
+	post   func(route string, toDo func(req Req) UrlResp)
 	listen func(port int)
 }
 
-type req struct {
+type Req struct {
 	method  string
 	route   string
 	params  map[string]string
@@ -33,14 +33,14 @@ type req struct {
 	getFile func(filename string) (multipart.File, *multipart.FileHeader, error)
 }
 
-type urlResp struct {
+type UrlResp struct {
 	body        string
 	contentType string
 	filename    string
 }
 
 var allRoutes [][]string
-var routeFunc map[string]func(req req) urlResp
+var routeFunc map[string]func(req Req) UrlResp
 
 func RemoveIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
@@ -127,12 +127,12 @@ OUTER:
 	return false, "", "", make(map[string]string)
 }
 
-func AppConstructor(ap app) app {
+func appConstructor(ap App) App {
 
-	routeFunc = make(map[string]func(req req) urlResp)
+	routeFunc = make(map[string]func(req Req) UrlResp)
 
 	// handle get request
-	ap.get = func(route string, toDo func(req req) urlResp) {
+	ap.get = func(route string, toDo func(req Req) UrlResp) {
 
 		// make sure route starts with a slash
 		if strings.HasPrefix(route, "/") {
@@ -172,7 +172,7 @@ func AppConstructor(ap app) app {
 							url_params[k] = v[0]
 						}
 
-						requestObj := req{
+						requestObj := Req{
 							method: r.Method,
 							route:  r.URL.Path,
 							params: url_params,
@@ -212,7 +212,7 @@ func AppConstructor(ap app) app {
 							url_params[k] = v[0]
 						}
 
-						requestObj := req{
+						requestObj := Req{
 							method: r.Method,
 							route:  r.URL.Path,
 							params: url_params,
@@ -258,7 +258,7 @@ func AppConstructor(ap app) app {
 						url_params[k] = v[0]
 					}
 
-					requestObj := req{
+					requestObj := Req{
 						method: r.Method,
 						route:  r.URL.Path,
 						params: url_params,
@@ -294,7 +294,7 @@ func AppConstructor(ap app) app {
 	}
 
 	// handle post request
-	ap.post = func(route string, toDo func(req req) urlResp) {
+	ap.post = func(route string, toDo func(req Req) UrlResp) {
 
 		if strings.HasPrefix(route, "/") {
 		} else {
@@ -342,7 +342,7 @@ func AppConstructor(ap app) app {
 							bodyString := string(bodyBytes)
 
 							// make request object
-							requestObj := req{
+							requestObj := Req{
 								method: r.Method,
 								route:  r.URL.Path,
 								params: url_params,
@@ -399,7 +399,7 @@ func AppConstructor(ap app) app {
 						url_params[k] = v[0]
 					}
 
-					requestObj := req{
+					requestObj := Req{
 						method: r.Method,
 						route:  r.URL.Path,
 						params: url_params,
@@ -448,15 +448,15 @@ func AppConstructor(ap app) app {
 
 // make the app
 // app := Server()
-func Server() app {
-	app := app{}
-	app = AppConstructor(app)
+func Server() App {
+	app := App{}
+	app = appConstructor(app)
 	return app
 }
 
 // render html template
 // returns text from html file
-func renderHtml(filepath string, temp_data interface{}) urlResp {
+func RenderHtml(filepath string, temp_data interface{}) UrlResp {
 	if temp_data == nil {
 		t, _ := template.ParseFiles(filepath)
 		var tpl bytes.Buffer
@@ -467,7 +467,7 @@ func renderHtml(filepath string, temp_data interface{}) urlResp {
 		t.Execute(&tpl, template_data)
 		html := tpl.String()
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(html),
 			filename:    "",
 			contentType: "html",
@@ -483,7 +483,7 @@ func renderHtml(filepath string, temp_data interface{}) urlResp {
 
 		html := tpl.String()
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(html),
 			filename:    "",
 			contentType: "html",
@@ -500,7 +500,7 @@ func renderHtml(filepath string, temp_data interface{}) urlResp {
 		t.Execute(&tpl, template_data)
 		html := tpl.String()
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(html),
 			filename:    "",
 			contentType: "html",
@@ -510,8 +510,8 @@ func renderHtml(filepath string, temp_data interface{}) urlResp {
 
 }
 
-func sendStr(bodyu string) urlResp {
-	return_value := urlResp{
+func SendStr(bodyu string) UrlResp {
+	return_value := UrlResp{
 		body:        bodyu,
 		filename:    "",
 		contentType: "html",
@@ -520,13 +520,13 @@ func sendStr(bodyu string) urlResp {
 }
 
 // converts a string, map, slice, or array to json and respondes to request
-func sendJson(bodyu interface{}) urlResp {
+func SendJson(bodyu interface{}) UrlResp {
 
 	// if type is string
 	if reflect.TypeOf(bodyu).Kind() == reflect.String {
 		real_body := fmt.Sprintf("%v", bodyu)
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        real_body,
 			filename:    "",
 			contentType: "json",
@@ -540,7 +540,7 @@ func sendJson(bodyu interface{}) urlResp {
 		if err != nil {
 			fmt.Println(err)
 		}
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(real_body),
 			filename:    "",
 			contentType: "json",
@@ -554,7 +554,7 @@ func sendJson(bodyu interface{}) urlResp {
 			fmt.Println(err)
 		}
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(real_body),
 			filename:    "",
 			contentType: "json",
@@ -567,7 +567,7 @@ func sendJson(bodyu interface{}) urlResp {
 			fmt.Println(err)
 		}
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(real_body),
 			filename:    "",
 			contentType: "json",
@@ -581,7 +581,7 @@ func sendJson(bodyu interface{}) urlResp {
 			fmt.Println(err)
 		}
 
-		return_value := urlResp{
+		return_value := UrlResp{
 			body:        string(json_data),
 			filename:    "",
 			contentType: "json",
@@ -590,11 +590,11 @@ func sendJson(bodyu interface{}) urlResp {
 		return return_value
 	}
 
-	return urlResp{body: "other", filename: "", contentType: "json"}
+	return UrlResp{body: "other", filename: "", contentType: "json"}
 }
 
-func sendFile(filepath string) urlResp {
-	return_data := urlResp{
+func SendFile(filepath string) UrlResp {
+	return_data := UrlResp{
 		body:        filepath,
 		filename:    "",
 		contentType: "file",
@@ -602,29 +602,13 @@ func sendFile(filepath string) urlResp {
 	return return_data
 }
 
-func downloadFile(filepath string, filenamee string) urlResp {
-	return_data := urlResp{
+func DownloadFile(filepath string, filenamee string) UrlResp {
+	return_data := UrlResp{
 		body:        filepath,
 		filename:    filenamee,
 		contentType: "download",
 	}
 	return return_data
-}
-
-func getCode(r *http.Request, defaultCode int) (int, string) {
-	p := strings.Split(r.URL.Path, "/")
-	if len(p) == 1 {
-		return defaultCode, p[0]
-	} else if len(p) > 1 {
-		code, err := strconv.Atoi(p[0])
-		if err == nil {
-			return code, p[1]
-		} else {
-			return defaultCode, p[1]
-		}
-	} else {
-		return defaultCode, ""
-	}
 }
 
 type Cookie struct {
@@ -634,7 +618,7 @@ type Cookie struct {
 	Expires time.Time
 }
 
-func setCookie(request req, cookie_data Cookie) {
+func SetCookie(request Req, cookie_data Cookie) {
 
 	http_cookie := &http.Cookie{
 		Name:     cookie_data.Name,
@@ -647,7 +631,7 @@ func setCookie(request req, cookie_data Cookie) {
 	http.SetCookie(request.w, http_cookie)
 }
 
-func getCookie(request req, name string) (string, error) {
+func GetCookie(request Req, name string) (string, error) {
 	c, err := request.r.Cookie(name)
 
 	if err != nil {
@@ -656,7 +640,7 @@ func getCookie(request req, name string) (string, error) {
 	return c.Value, nil
 }
 
-func removeCookie(request req, name string) {
+func RemoveCookie(request Req, name string) {
 	http_cookie := &http.Cookie{
 		Name:     name,
 		Value:    "",
@@ -671,70 +655,70 @@ func removeCookie(request req, name string) {
 func main() {
 	app := Server()
 	// routes
-	app.post("/home/{id}", func(req req) urlResp {
+	app.post("/home/{id}", func(req Req) UrlResp {
 
-		return sendFile("./img.jpg")
+		return SendFile("./img.jpg")
 	})
 
-	app.get("/", func(req req) urlResp {
+	app.get("/", func(req Req) UrlResp {
 
-		return renderHtml("./templates/index.html", nil)
+		return RenderHtml("./templates/index.html", nil)
 	})
 
-	app.get("/about/{id}/{type}", func(req req) urlResp {
-		cookie_val, err := getCookie(req, "cook1")
+	app.get("/about/{id}/{type}", func(req Req) UrlResp {
+		cookie_val, err := GetCookie(req, "cook1")
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		return sendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"] + "<br> " + cookie_val)
+		return SendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"] + "<br> " + cookie_val)
 
 	})
 
-	app.get("/s", func(req req) urlResp {
+	app.get("/s", func(req Req) UrlResp {
 
 		my_mape := make(map[string]int)
 		my_mape["k1"] = 8
 
-		return downloadFile("./img.jpg", "myimage11.jpg")
+		return DownloadFile("./img.jpg", "myimage11.jpg")
 	})
 
-	app.get("/videos/{id}", func(req req) urlResp {
+	app.get("/videos/{id}", func(req Req) UrlResp {
 		id := req.props["id"]
-		removeCookie(req, "cook1")
+		RemoveCookie(req, "cook1")
 
-		return sendStr("This is the videos page " + id)
+		return SendStr("This is the videos page " + id)
 	})
-	app.get(`/videos/about`, func(req req) urlResp {
+	app.get(`/videos/about`, func(req Req) UrlResp {
 
-		setCookie(req, Cookie{
+		SetCookie(req, Cookie{
 			Name:    "cook1",
 			Value:   "mycookeieval",
 			Expires: time.Now().Add(time.Hour + time.Hour),
 		})
 
-		return sendStr("video about page")
+		return SendStr("video about page")
 	})
 
-	app.get("/img/{ids}", func(req req) urlResp {
-		setCookie(req, Cookie{
+	app.get("/img/{ids}", func(req Req) UrlResp {
+		SetCookie(req, Cookie{
 			Name:    "cook1",
 			Value:   "changed-cookie",
 			Expires: time.Now().Add(time.Hour + time.Hour),
 		})
 
-		return sendStr("ssss " + req.props["ids"])
+		return SendStr("ssss " + req.props["ids"])
 	})
 
-	app.get("/agg/{id}/{name}", func(req req) urlResp {
-		return sendStr(req.props["id"] + `  ` + req.props["name"])
+	app.get("/agg/{id}/{name}", func(req Req) UrlResp {
+		return SendStr(req.props["id"] + `  ` + req.props["name"])
 	})
-	app.get("/agg/videos/{id}", func(req req) urlResp {
+	app.get("/agg/videos/{id}", func(req Req) UrlResp {
 
-		return sendStr("image:   " + req.props["id"])
+		return SendStr("image:   " + req.props["id"])
 	})
 
-	app.get("/agg", func(req req) urlResp {
+	app.get("/agg", func(req Req) UrlResp {
 
 		// make struct of data to pass to template
 		type newsAggPage struct {
@@ -749,12 +733,12 @@ func main() {
 			Posts: []string{"Post 1", "Post 2", "Post3"},
 		}
 
-		return renderHtml(`./templates/temp.html`, data2)
+		return RenderHtml(`./templates/temp.html`, data2)
 	})
-	app.get("/upload", func(req req) urlResp {
-		return renderHtml(`./templates/upload.html`, nil)
+	app.get("/upload", func(req Req) UrlResp {
+		return RenderHtml(`./templates/upload.html`, nil)
 	})
-	app.post("/file-up", func(req req) urlResp {
+	app.post("/file-up", func(req Req) UrlResp {
 
 		file, header, err := req.getFile("myfile")
 
@@ -764,18 +748,18 @@ func main() {
 		fmt.Println(header)
 		fmt.Println(file)
 
-		return sendStr("good")
+		return SendStr("good")
 	})
 
-	app.get(`/users/{id}`, func(req req) urlResp {
-		return sendStr("user: " + req.props["id"])
+	app.get(`/users/{id}`, func(req Req) UrlResp {
+		return SendStr("user: " + req.props["id"])
 	})
 
-	app.get(`/users/{id}/posts`, func(req req) urlResp {
-		return sendStr("user: " + req.props["id"] + " posts")
+	app.get(`/users/{id}/posts`, func(req Req) UrlResp {
+		return SendStr("user: " + req.props["id"] + " posts")
 	})
-	app.get(`/users/{id}/followers`, func(req req) urlResp {
-		return sendStr("user: " + req.props["id"] + ` followers`)
+	app.get(`/users/{id}/followers`, func(req Req) UrlResp {
+		return SendStr("user: " + req.props["id"] + ` followers`)
 	})
 
 	app.listen(8090)
