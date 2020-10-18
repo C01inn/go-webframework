@@ -17,20 +17,20 @@ import (
 
 // make structs uppercase so they get exported
 type App struct {
-	get    func(route string, toDo func(req Req) UrlResp)
-	post   func(route string, toDo func(req Req) UrlResp)
-	listen func(port int)
+	Get    func(route string, toDo func(req Req) UrlResp)
+	Post   func(route string, toDo func(req Req) UrlResp)
+	Listen func(port int)
 }
 
 type Req struct {
-	method  string
-	route   string
-	params  map[string]string
-	body    string
-	props   map[string]string
-	w       http.ResponseWriter
-	r       *http.Request
-	getFile func(filename string) (multipart.File, *multipart.FileHeader, error)
+	Method  string
+	Route   string
+	Params  map[string]string
+	Body    string
+	Props   map[string]string
+	W       http.ResponseWriter
+	R       *http.Request
+	GetFile func(filename string) (multipart.File, *multipart.FileHeader, error)
 }
 
 type UrlResp struct {
@@ -42,7 +42,7 @@ type UrlResp struct {
 var allRoutes [][]string
 var routeFunc map[string]func(req Req) UrlResp
 
-func RemoveIndex(s []string, index int) []string {
+func removeIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
 }
 
@@ -56,10 +56,10 @@ OUTER:
 			if strings.Contains(jk[0], "{") == true && strings.Contains(jk[0], "}") == true {
 
 				routeValues := strings.Split(route, "/")
-				routeValues = RemoveIndex(routeValues, 0)
+				routeValues = removeIndex(routeValues, 0)
 
 				ll := strings.Split(jk[0], "/")
-				ll = RemoveIndex(ll, 0)
+				ll = removeIndex(ll, 0)
 
 				if len(routeValues) == len(ll) && routeValues[0] == ll[0] {
 					// check to see if it matches better with another route
@@ -69,7 +69,7 @@ OUTER:
 					for _, route1 := range allRoutes {
 
 						route1Values := strings.Split(route1[0], "/")
-						route1Values = RemoveIndex(route1Values, 0)
+						route1Values = removeIndex(route1Values, 0)
 						matching_score := 0
 						for _, cc := range routeValues {
 
@@ -132,7 +132,7 @@ func appConstructor(ap App) App {
 	routeFunc = make(map[string]func(req Req) UrlResp)
 
 	// handle get request
-	ap.get = func(route string, toDo func(req Req) UrlResp) {
+	ap.Get = func(route string, toDo func(req Req) UrlResp) {
 
 		// make sure route starts with a slash
 		if strings.HasPrefix(route, "/") {
@@ -173,13 +173,13 @@ func appConstructor(ap App) App {
 						}
 
 						requestObj := Req{
-							method: r.Method,
-							route:  r.URL.Path,
-							params: url_params,
-							body:   "",
-							props:  url_vars,
-							w:      w,
-							r:      r,
+							Method: r.Method,
+							Route:  r.URL.Path,
+							Params: url_params,
+							Body:   "",
+							Props:  url_vars,
+							W:      w,
+							R:      r,
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -213,13 +213,13 @@ func appConstructor(ap App) App {
 						}
 
 						requestObj := Req{
-							method: r.Method,
-							route:  r.URL.Path,
-							params: url_params,
-							body:   bodyString,
-							props:  url_vars,
-							w:      w,
-							r:      r,
+							Method: r.Method,
+							Route:  r.URL.Path,
+							Params: url_params,
+							Body:   bodyString,
+							Props:  url_vars,
+							W:      w,
+							R:      r,
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -259,12 +259,12 @@ func appConstructor(ap App) App {
 					}
 
 					requestObj := Req{
-						method: r.Method,
-						route:  r.URL.Path,
-						params: url_params,
-						body:   "",
-						w:      w,
-						r:      r,
+						Method: r.Method,
+						Route:  r.URL.Path,
+						Params: url_params,
+						Body:   "",
+						W:      w,
+						R:      r,
 					}
 
 					resp := toDo(requestObj)
@@ -294,7 +294,7 @@ func appConstructor(ap App) App {
 	}
 
 	// handle post request
-	ap.post = func(route string, toDo func(req Req) UrlResp) {
+	ap.Post = func(route string, toDo func(req Req) UrlResp) {
 
 		if strings.HasPrefix(route, "/") {
 		} else {
@@ -343,14 +343,14 @@ func appConstructor(ap App) App {
 
 							// make request object
 							requestObj := Req{
-								method: r.Method,
-								route:  r.URL.Path,
-								params: url_params,
-								body:   bodyString,
-								props:  url_vars,
-								w:      w,
-								r:      r,
-								getFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+								Method: r.Method,
+								Route:  r.URL.Path,
+								Params: url_params,
+								Body:   bodyString,
+								Props:  url_vars,
+								W:      w,
+								R:      r,
+								GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
 									file, header, err := r.FormFile(filename)
 									return file, header, err
 								},
@@ -400,13 +400,13 @@ func appConstructor(ap App) App {
 					}
 
 					requestObj := Req{
-						method: r.Method,
-						route:  r.URL.Path,
-						params: url_params,
-						body:   bodyString,
-						w:      w,
-						r:      r,
-						getFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+						Method: r.Method,
+						Route:  r.URL.Path,
+						Params: url_params,
+						Body:   bodyString,
+						W:      w,
+						R:      r,
+						GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
 							file, header, err := r.FormFile(filename)
 							return file, header, err
 						},
@@ -436,7 +436,7 @@ func appConstructor(ap App) App {
 	}
 
 	// listen on a port
-	ap.listen = func(port2 int) {
+	ap.Listen = func(port2 int) {
 		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port2), nil)
 
@@ -628,11 +628,11 @@ func SetCookie(request Req, cookie_data Cookie) {
 		Path:     "/",
 	}
 
-	http.SetCookie(request.w, http_cookie)
+	http.SetCookie(request.W, http_cookie)
 }
 
 func GetCookie(request Req, name string) (string, error) {
-	c, err := request.r.Cookie(name)
+	c, err := request.R.Cookie(name)
 
 	if err != nil {
 		return "", err
@@ -649,119 +649,121 @@ func RemoveCookie(request Req, name string) {
 		Path:     "/",
 		MaxAge:   -1,
 	}
-	http.SetCookie(request.w, http_cookie)
+	http.SetCookie(request.W, http_cookie)
 }
 
 func main() {
-	app := Server()
-	// routes
-	app.post("/home/{id}", func(req Req) UrlResp {
+	/*
+		app := Server()
+		// routes
+		app.post("/home/{id}", func(req Req) UrlResp {
 
-		return SendFile("./img.jpg")
-	})
-
-	app.get("/", func(req Req) UrlResp {
-
-		return RenderHtml("./templates/index.html", nil)
-	})
-
-	app.get("/about/{id}/{type}", func(req Req) UrlResp {
-		cookie_val, err := GetCookie(req, "cook1")
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		return SendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"] + "<br> " + cookie_val)
-
-	})
-
-	app.get("/s", func(req Req) UrlResp {
-
-		my_mape := make(map[string]int)
-		my_mape["k1"] = 8
-
-		return DownloadFile("./img.jpg", "myimage11.jpg")
-	})
-
-	app.get("/videos/{id}", func(req Req) UrlResp {
-		id := req.props["id"]
-		RemoveCookie(req, "cook1")
-
-		return SendStr("This is the videos page " + id)
-	})
-	app.get(`/videos/about`, func(req Req) UrlResp {
-
-		SetCookie(req, Cookie{
-			Name:    "cook1",
-			Value:   "mycookeieval",
-			Expires: time.Now().Add(time.Hour + time.Hour),
+			return SendFile("./img.jpg")
 		})
 
-		return SendStr("video about page")
-	})
+		app.get("/", func(req Req) UrlResp {
 
-	app.get("/img/{ids}", func(req Req) UrlResp {
-		SetCookie(req, Cookie{
-			Name:    "cook1",
-			Value:   "changed-cookie",
-			Expires: time.Now().Add(time.Hour + time.Hour),
+			return RenderHtml("./templates/index.html", nil)
 		})
 
-		return SendStr("ssss " + req.props["ids"])
-	})
+		app.get("/about/{id}/{type}", func(req Req) UrlResp {
+			cookie_val, err := GetCookie(req, "cook1")
+			if err != nil {
+				fmt.Println(err)
+			}
 
-	app.get("/agg/{id}/{name}", func(req Req) UrlResp {
-		return SendStr(req.props["id"] + `  ` + req.props["name"])
-	})
-	app.get("/agg/videos/{id}", func(req Req) UrlResp {
+			return SendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"] + "<br> " + cookie_val)
 
-		return SendStr("image:   " + req.props["id"])
-	})
+		})
 
-	app.get("/agg", func(req Req) UrlResp {
+		app.get("/s", func(req Req) UrlResp {
 
-		// make struct of data to pass to template
-		type newsAggPage struct {
-			Title string
-			News  string
-			Posts []string
-		}
+			my_mape := make(map[string]int)
+			my_mape["k1"] = 8
 
-		data2 := newsAggPage{
-			Title: "",
-			News:  "Fake news!",
-			Posts: []string{"Post 1", "Post 2", "Post3"},
-		}
+			return DownloadFile("./img.jpg", "myimage11.jpg")
+		})
 
-		return RenderHtml(`./templates/temp.html`, data2)
-	})
-	app.get("/upload", func(req Req) UrlResp {
-		return RenderHtml(`./templates/upload.html`, nil)
-	})
-	app.post("/file-up", func(req Req) UrlResp {
+		app.get("/videos/{id}", func(req Req) UrlResp {
+			id := req.props["id"]
+			RemoveCookie(req, "cook1")
 
-		file, header, err := req.getFile("myfile")
+			return SendStr("This is the videos page " + id)
+		})
+		app.get(`/videos/about`, func(req Req) UrlResp {
 
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println(header)
-		fmt.Println(file)
+			SetCookie(req, Cookie{
+				Name:    "cook1",
+				Value:   "mycookeieval",
+				Expires: time.Now().Add(time.Hour + time.Hour),
+			})
 
-		return SendStr("good")
-	})
+			return SendStr("video about page")
+		})
 
-	app.get(`/users/{id}`, func(req Req) UrlResp {
-		return SendStr("user: " + req.props["id"])
-	})
+		app.get("/img/{ids}", func(req Req) UrlResp {
+			SetCookie(req, Cookie{
+				Name:    "cook1",
+				Value:   "changed-cookie",
+				Expires: time.Now().Add(time.Hour + time.Hour),
+			})
 
-	app.get(`/users/{id}/posts`, func(req Req) UrlResp {
-		return SendStr("user: " + req.props["id"] + " posts")
-	})
-	app.get(`/users/{id}/followers`, func(req Req) UrlResp {
-		return SendStr("user: " + req.props["id"] + ` followers`)
-	})
+			return SendStr("ssss " + req.props["ids"])
+		})
 
-	app.listen(8090)
+		app.get("/agg/{id}/{name}", func(req Req) UrlResp {
+			return SendStr(req.props["id"] + `  ` + req.props["name"])
+		})
+		app.get("/agg/videos/{id}", func(req Req) UrlResp {
+
+			return SendStr("image:   " + req.props["id"])
+		})
+
+		app.get("/agg", func(req Req) UrlResp {
+
+			// make struct of data to pass to template
+			type newsAggPage struct {
+				Title string
+				News  string
+				Posts []string
+			}
+
+			data2 := newsAggPage{
+				Title: "",
+				News:  "Fake news!",
+				Posts: []string{"Post 1", "Post 2", "Post3"},
+			}
+
+			return RenderHtml(`./templates/temp.html`, data2)
+		})
+		app.get("/upload", func(req Req) UrlResp {
+			return RenderHtml(`./templates/upload.html`, nil)
+		})
+		app.post("/file-up", func(req Req) UrlResp {
+
+			file, header, err := req.getFile("myfile")
+
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(header)
+			fmt.Println(file)
+
+			return SendStr("good")
+		})
+
+		app.get(`/users/{id}`, func(req Req) UrlResp {
+			return SendStr("user: " + req.props["id"])
+		})
+
+		app.get(`/users/{id}/posts`, func(req Req) UrlResp {
+			return SendStr("user: " + req.props["id"] + " posts")
+		})
+		app.get(`/users/{id}/followers`, func(req Req) UrlResp {
+			return SendStr("user: " + req.props["id"] + ` followers`)
+		})
+
+		app.listen(8090)
+	*/
 
 }
