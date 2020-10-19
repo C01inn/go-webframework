@@ -1,4 +1,4 @@
-package swift
+package main
 
 import (
 	"bytes"
@@ -19,6 +19,9 @@ import (
 type App struct {
 	Get    func(route string, toDo func(req Req) UrlResp)
 	Post   func(route string, toDo func(req Req) UrlResp)
+	Put    func(route string, toDo func(req Req) UrlResp)
+	Delete func(route string, toDo func(req Req) UrlResp)
+	Patch  func(route string, toDo func(req Req) UrlResp)
 	Listen func(port int)
 }
 
@@ -153,7 +156,7 @@ func appConstructor(ap App) App {
 
 		var routeSlice []string
 		routeSlice = append(routeSlice, route)
-		routeSlice = append(routeSlice, "GET")
+		routeSlice = append(routeSlice, http.MethodGet)
 		allRoutes = append(allRoutes, routeSlice)
 
 		routeFunc[route] = toDo
@@ -164,7 +167,7 @@ func appConstructor(ap App) App {
 				// check if its a route with a parameter
 				parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
 				if parameterRoute == true {
-					if routeMethod == r.Method && routeMethod == "GET" {
+					if routeMethod == r.Method && routeMethod == http.MethodGet {
 						url_params := make(map[string]string)
 
 						// add url param key and values to map
@@ -314,13 +317,439 @@ func appConstructor(ap App) App {
 
 		var routeSlice1 []string
 		routeSlice1 = append(routeSlice1, route)
-		routeSlice1 = append(routeSlice1, "POST")
+		routeSlice1 = append(routeSlice1, http.MethodPost)
 		allRoutes = append(allRoutes, routeSlice1)
 
 		routeFunc[route] = toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
+				if route != r.URL.Path {
+					// check if its a route with a parameter
+					parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
+					if parameterRoute == true {
+						if routeMethod == r.Method {
+
+							url_params := make(map[string]string)
+
+							// addd url param key and values to map
+							for k, v := range r.URL.Query() {
+								url_params[k] = v[0]
+							}
+
+							// get http body
+							bodyBytes, err := ioutil.ReadAll(r.Body)
+							if err != nil {
+								log.Fatal(err)
+							}
+							bodyString := string(bodyBytes)
+
+							// make request object
+							requestObj := Req{
+								Method: r.Method,
+								Route:  r.URL.Path,
+								Params: url_params,
+								Body:   bodyString,
+								Props:  url_vars,
+								W:      w,
+								R:      r,
+								GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+									file, header, err := r.FormFile(filename)
+									return file, header, err
+								},
+							}
+
+							resp := routeFunc[hashRoute](requestObj)
+							// check if user is returning html
+							if resp.contentType == "html" {
+								w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "json" {
+								w.Header().Set("Content-Type", "application/json")
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "file" {
+								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "download" {
+								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+								http.ServeFile(w, r, resp.body)
+							}
+						} else {
+							// if not return wront method
+							fmt.Fprintf(w, "Wrong Method")
+							return
+						}
+
+					} else {
+						// if not return 404
+						fmt.Fprintf(w, "404 Not Found")
+						return
+					}
+				} else {
+					r.ParseMultipartForm(5 * 1024 * 1024)
+
+					// get http body
+					bodyBytes, err := ioutil.ReadAll(r.Body)
+					if err != nil {
+						log.Fatal(err)
+					}
+					bodyString := string(bodyBytes)
+
+					url_params := make(map[string]string)
+
+					// addd url param key and values to map
+					for k, v := range r.URL.Query() {
+						url_params[k] = v[0]
+					}
+
+					requestObj := Req{
+						Method: r.Method,
+						Route:  r.URL.Path,
+						Params: url_params,
+						Body:   bodyString,
+						W:      w,
+						R:      r,
+						GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+							file, header, err := r.FormFile(filename)
+							return file, header, err
+						},
+					}
+
+					resp := toDo(requestObj)
+					// check if user is returning html
+					if resp.contentType == "html" {
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "json" {
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "file" {
+						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "download" {
+						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+						http.ServeFile(w, r, resp.body)
+					}
+				}
+
+			} else {
+				fmt.Fprintf(w, "Method not allowed")
+			}
+		})
+	}
+
+	// handle a Put request
+	ap.Put = func(route string, toDo func(req Req) UrlResp) {
+
+		if strings.HasPrefix(route, "/") {
+		} else {
+			panic("Route Must Start With a /")
+			return
+		}
+
+		// check if route already exists
+		for _, ccc := range allRoutes {
+			if ccc[0] == route {
+				panic("Route Already Exists")
+				return
+			} else {
+				continue
+			}
+		}
+
+		var routeSlice1 []string
+		routeSlice1 = append(routeSlice1, route)
+		routeSlice1 = append(routeSlice1, http.MethodPut)
+		allRoutes = append(allRoutes, routeSlice1)
+
+		routeFunc[route] = toDo
+
+		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPut {
+				if route != r.URL.Path {
+					// check if its a route with a parameter
+					parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
+					if parameterRoute == true {
+						if routeMethod == r.Method {
+
+							url_params := make(map[string]string)
+
+							// addd url param key and values to map
+							for k, v := range r.URL.Query() {
+								url_params[k] = v[0]
+							}
+
+							// get http body
+							bodyBytes, err := ioutil.ReadAll(r.Body)
+							if err != nil {
+								log.Fatal(err)
+							}
+							bodyString := string(bodyBytes)
+
+							// make request object
+							requestObj := Req{
+								Method: r.Method,
+								Route:  r.URL.Path,
+								Params: url_params,
+								Body:   bodyString,
+								Props:  url_vars,
+								W:      w,
+								R:      r,
+								GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+									file, header, err := r.FormFile(filename)
+									return file, header, err
+								},
+							}
+
+							resp := routeFunc[hashRoute](requestObj)
+							// check if user is returning html
+							if resp.contentType == "html" {
+								w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "json" {
+								w.Header().Set("Content-Type", "application/json")
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "file" {
+								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "download" {
+								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+								http.ServeFile(w, r, resp.body)
+							}
+						} else {
+							// if not return wront method
+							fmt.Fprintf(w, "Wrong Method")
+							return
+						}
+
+					} else {
+						// if not return 404
+						fmt.Fprintf(w, "404 Not Found")
+						return
+					}
+				} else {
+					r.ParseMultipartForm(5 * 1024 * 1024)
+
+					// get http body
+					bodyBytes, err := ioutil.ReadAll(r.Body)
+					if err != nil {
+						log.Fatal(err)
+					}
+					bodyString := string(bodyBytes)
+
+					url_params := make(map[string]string)
+
+					// addd url param key and values to map
+					for k, v := range r.URL.Query() {
+						url_params[k] = v[0]
+					}
+
+					requestObj := Req{
+						Method: r.Method,
+						Route:  r.URL.Path,
+						Params: url_params,
+						Body:   bodyString,
+						W:      w,
+						R:      r,
+						GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+							file, header, err := r.FormFile(filename)
+							return file, header, err
+						},
+					}
+
+					resp := toDo(requestObj)
+					// check if user is returning html
+					if resp.contentType == "html" {
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "json" {
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "file" {
+						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "download" {
+						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+						http.ServeFile(w, r, resp.body)
+					}
+				}
+
+			} else {
+				fmt.Fprintf(w, "Method not allowed")
+			}
+		})
+	}
+
+	// handle a Delete Request
+	ap.Delete = func(route string, toDo func(req Req) UrlResp) {
+
+		if strings.HasPrefix(route, "/") {
+		} else {
+			panic("Route Must Start With a /")
+			return
+		}
+
+		// check if route already exists
+		for _, ccc := range allRoutes {
+			if ccc[0] == route {
+				panic("Route Already Exists")
+				return
+			} else {
+				continue
+			}
+		}
+
+		var routeSlice1 []string
+		routeSlice1 = append(routeSlice1, route)
+		routeSlice1 = append(routeSlice1, http.MethodDelete)
+		allRoutes = append(allRoutes, routeSlice1)
+
+		routeFunc[route] = toDo
+
+		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodDelete {
+				if route != r.URL.Path {
+					// check if its a route with a parameter
+					parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
+					if parameterRoute == true {
+						if routeMethod == r.Method {
+
+							url_params := make(map[string]string)
+
+							// addd url param key and values to map
+							for k, v := range r.URL.Query() {
+								url_params[k] = v[0]
+							}
+
+							// get http body
+							bodyBytes, err := ioutil.ReadAll(r.Body)
+							if err != nil {
+								log.Fatal(err)
+							}
+							bodyString := string(bodyBytes)
+
+							// make request object
+							requestObj := Req{
+								Method: r.Method,
+								Route:  r.URL.Path,
+								Params: url_params,
+								Body:   bodyString,
+								Props:  url_vars,
+								W:      w,
+								R:      r,
+								GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+									file, header, err := r.FormFile(filename)
+									return file, header, err
+								},
+							}
+
+							resp := routeFunc[hashRoute](requestObj)
+							// check if user is returning html
+							if resp.contentType == "html" {
+								w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "json" {
+								w.Header().Set("Content-Type", "application/json")
+								fmt.Fprint(w, resp.body)
+							} else if resp.contentType == "file" {
+								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "download" {
+								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+								http.ServeFile(w, r, resp.body)
+							}
+						} else {
+							// if not return wront method
+							fmt.Fprintf(w, "Wrong Method")
+							return
+						}
+
+					} else {
+						// if not return 404
+						fmt.Fprintf(w, "404 Not Found")
+						return
+					}
+				} else {
+					r.ParseMultipartForm(5 * 1024 * 1024)
+
+					// get http body
+					bodyBytes, err := ioutil.ReadAll(r.Body)
+					if err != nil {
+						log.Fatal(err)
+					}
+					bodyString := string(bodyBytes)
+
+					url_params := make(map[string]string)
+
+					// addd url param key and values to map
+					for k, v := range r.URL.Query() {
+						url_params[k] = v[0]
+					}
+
+					requestObj := Req{
+						Method: r.Method,
+						Route:  r.URL.Path,
+						Params: url_params,
+						Body:   bodyString,
+						W:      w,
+						R:      r,
+						GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
+							file, header, err := r.FormFile(filename)
+							return file, header, err
+						},
+					}
+
+					resp := toDo(requestObj)
+					// check if user is returning html
+					if resp.contentType == "html" {
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "json" {
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprint(w, resp.body)
+					} else if resp.contentType == "file" {
+						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "download" {
+						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
+						http.ServeFile(w, r, resp.body)
+					}
+				}
+
+			} else {
+				fmt.Fprintf(w, "Method not allowed")
+			}
+		})
+	}
+
+	// handle a Patch Request
+	ap.Patch = func(route string, toDo func(req Req) UrlResp) {
+
+		if strings.HasPrefix(route, "/") {
+		} else {
+			panic("Route Must Start With a /")
+			return
+		}
+
+		// check if route already exists
+		for _, ccc := range allRoutes {
+			if ccc[0] == route {
+				panic("Route Already Exists")
+				return
+			} else {
+				continue
+			}
+		}
+
+		var routeSlice1 []string
+		routeSlice1 = append(routeSlice1, route)
+		routeSlice1 = append(routeSlice1, http.MethodPatch)
+		allRoutes = append(allRoutes, routeSlice1)
+
+		routeFunc[route] = toDo
+
+		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPatch {
 				if route != r.URL.Path {
 					// check if its a route with a parameter
 					parameterRoute, hashRoute, routeMethod, url_vars := checkRouteParams(r.URL.Path)
@@ -653,117 +1082,133 @@ func RemoveCookie(request Req, name string) {
 }
 
 func main() {
-	/*
-		app := Server()
-		// routes
-		app.post("/home/{id}", func(req Req) UrlResp {
+	fmt.Println(http.MethodPatch)
+	app := Server()
+	// routes
+	app.Post("/home/{id}", func(req Req) UrlResp {
 
-			return SendFile("./img.jpg")
+		return SendFile("./img.jpg")
+	})
+
+	app.Get("/", func(req Req) UrlResp {
+
+		return RenderHtml("./templates/index.html", nil)
+	})
+
+	app.Get("/about/{id}/{type}", func(req Req) UrlResp {
+		cookie_val, err := GetCookie(req, "cook1")
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		return SendStr("Id: " + req.Props["id"] + "<br>" + "Type: " + req.Props["type"] + "<br> " + cookie_val)
+
+	})
+
+	app.Get("/s", func(req Req) UrlResp {
+
+		my_mape := make(map[string]int)
+		my_mape["k1"] = 8
+
+		return DownloadFile("./img.jpg", "myimage11.jpg")
+	})
+
+	app.Get("/videos/{id}", func(req Req) UrlResp {
+		id := req.Props["id"]
+		RemoveCookie(req, "cook1")
+
+		return SendStr("This is the videos page " + id)
+	})
+	app.Get(`/videos/about`, func(req Req) UrlResp {
+
+		SetCookie(req, Cookie{
+			Name:    "cook1",
+			Value:   "mycookeieval",
+			Expires: time.Now().Add(time.Hour + time.Hour),
 		})
 
-		app.get("/", func(req Req) UrlResp {
+		return SendStr("video about page")
+	})
 
-			return RenderHtml("./templates/index.html", nil)
+	app.Get("/img/{ids}", func(req Req) UrlResp {
+		SetCookie(req, Cookie{
+			Name:    "cook1",
+			Value:   "changed-cookie",
+			Expires: time.Now().Add(time.Hour + time.Hour),
 		})
 
-		app.get("/about/{id}/{type}", func(req Req) UrlResp {
-			cookie_val, err := GetCookie(req, "cook1")
-			if err != nil {
-				fmt.Println(err)
-			}
+		return SendStr("ssss " + req.Props["ids"])
+	})
 
-			return SendStr("Id: " + req.props["id"] + "<br>" + "Type: " + req.props["type"] + "<br> " + cookie_val)
+	app.Get("/agg/{id}/{name}", func(req Req) UrlResp {
+		return SendStr(req.Props["id"] + `  ` + req.Props["name"])
+	})
+	app.Get("/agg/videos/{id}", func(req Req) UrlResp {
 
-		})
+		return SendStr("image:   " + req.Props["id"])
+	})
 
-		app.get("/s", func(req Req) UrlResp {
+	app.Get("/agg", func(req Req) UrlResp {
 
-			my_mape := make(map[string]int)
-			my_mape["k1"] = 8
+		// make struct of data to pass to template
+		type newsAggPage struct {
+			Title string
+			News  string
+			Posts []string
+		}
 
-			return DownloadFile("./img.jpg", "myimage11.jpg")
-		})
+		data2 := newsAggPage{
+			Title: "",
+			News:  "Fake news!",
+			Posts: []string{"Post 1", "Post 2", "Post3"},
+		}
 
-		app.get("/videos/{id}", func(req Req) UrlResp {
-			id := req.props["id"]
-			RemoveCookie(req, "cook1")
+		return RenderHtml(`./templates/temp.html`, data2)
+	})
+	app.Get("/upload", func(req Req) UrlResp {
+		return RenderHtml(`./templates/upload.html`, nil)
+	})
+	app.Post("/file-up", func(req Req) UrlResp {
 
-			return SendStr("This is the videos page " + id)
-		})
-		app.get(`/videos/about`, func(req Req) UrlResp {
+		file, header, err := req.GetFile("myfile")
 
-			SetCookie(req, Cookie{
-				Name:    "cook1",
-				Value:   "mycookeieval",
-				Expires: time.Now().Add(time.Hour + time.Hour),
-			})
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(header)
+		fmt.Println(file)
 
-			return SendStr("video about page")
-		})
+		return SendStr("good")
+	})
 
-		app.get("/img/{ids}", func(req Req) UrlResp {
-			SetCookie(req, Cookie{
-				Name:    "cook1",
-				Value:   "changed-cookie",
-				Expires: time.Now().Add(time.Hour + time.Hour),
-			})
+	app.Get(`/users/{id}`, func(req Req) UrlResp {
+		return SendStr("user: " + req.Props["id"])
+	})
 
-			return SendStr("ssss " + req.props["ids"])
-		})
+	app.Get(`/users/{id}/posts`, func(req Req) UrlResp {
+		return SendStr("user: " + req.Props["id"] + " posts")
+	})
+	app.Get(`/users/{id}/followers`, func(req Req) UrlResp {
+		return SendStr("user: " + req.Props["id"] + ` followers`)
+	})
 
-		app.get("/agg/{id}/{name}", func(req Req) UrlResp {
-			return SendStr(req.props["id"] + `  ` + req.props["name"])
-		})
-		app.get("/agg/videos/{id}", func(req Req) UrlResp {
+	app.Put(`/another/{id}`, func(req Req) UrlResp {
+		fmt.Println(req.Props["id"])
+		return SendStr(req.Body)
+	})
 
-			return SendStr("image:   " + req.props["id"])
-		})
+	app.Delete(`/del/{name}`, func(req Req) UrlResp {
+		fmt.Println(req.Props["name"])
+		return SendStr(req.Body)
+	})
 
-		app.get("/agg", func(req Req) UrlResp {
+	app.Patch(`/patch/{id}`, func(req Req) UrlResp {
 
-			// make struct of data to pass to template
-			type newsAggPage struct {
-				Title string
-				News  string
-				Posts []string
-			}
+		fmt.Println("patch")
+		fmt.Println(req.Props["id"])
+		return SendStr(req.Body)
+	})
 
-			data2 := newsAggPage{
-				Title: "",
-				News:  "Fake news!",
-				Posts: []string{"Post 1", "Post 2", "Post3"},
-			}
-
-			return RenderHtml(`./templates/temp.html`, data2)
-		})
-		app.get("/upload", func(req Req) UrlResp {
-			return RenderHtml(`./templates/upload.html`, nil)
-		})
-		app.post("/file-up", func(req Req) UrlResp {
-
-			file, header, err := req.getFile("myfile")
-
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println(header)
-			fmt.Println(file)
-
-			return SendStr("good")
-		})
-
-		app.get(`/users/{id}`, func(req Req) UrlResp {
-			return SendStr("user: " + req.props["id"])
-		})
-
-		app.get(`/users/{id}/posts`, func(req Req) UrlResp {
-			return SendStr("user: " + req.props["id"] + " posts")
-		})
-		app.get(`/users/{id}/followers`, func(req Req) UrlResp {
-			return SendStr("user: " + req.props["id"] + ` followers`)
-		})
-
-		app.listen(8090)
-	*/
+	app.Listen(8090)
 
 }
