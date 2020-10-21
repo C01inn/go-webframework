@@ -34,6 +34,7 @@ type Req struct {
 	W       http.ResponseWriter
 	R       *http.Request
 	GetFile func(filename string) (multipart.File, *multipart.FileHeader, error)
+	Form    map[string][]string
 }
 
 type UrlResp struct {
@@ -183,6 +184,7 @@ func appConstructor(ap App) App {
 							Props:  url_vars,
 							W:      w,
 							R:      r,
+							Form:   r.Form,
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -223,6 +225,7 @@ func appConstructor(ap App) App {
 							Props:  url_vars,
 							W:      w,
 							R:      r,
+							Form:   r.Form,
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -268,6 +271,7 @@ func appConstructor(ap App) App {
 						Body:   "",
 						W:      w,
 						R:      r,
+						Form:   r.Form,
 					}
 
 					resp := toDo(requestObj)
@@ -354,9 +358,10 @@ func appConstructor(ap App) App {
 								W:      w,
 								R:      r,
 								GetFile: func(filename string) (multipart.File, *multipart.FileHeader, error) {
-									file, header, err := r.FormFile(filename)
-									return file, header, err
+
+									return r.FormFile(filename)
 								},
+								Form: r.Form,
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -413,6 +418,7 @@ func appConstructor(ap App) App {
 							file, header, err := r.FormFile(filename)
 							return file, header, err
 						},
+						Form: r.Form,
 					}
 
 					resp := toDo(requestObj)
@@ -499,6 +505,7 @@ func appConstructor(ap App) App {
 									file, header, err := r.FormFile(filename)
 									return file, header, err
 								},
+								Form: r.Form,
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -555,6 +562,7 @@ func appConstructor(ap App) App {
 							file, header, err := r.FormFile(filename)
 							return file, header, err
 						},
+						Form: r.Form,
 					}
 
 					resp := toDo(requestObj)
@@ -641,6 +649,7 @@ func appConstructor(ap App) App {
 									file, header, err := r.FormFile(filename)
 									return file, header, err
 								},
+								Form: r.Form,
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -697,6 +706,7 @@ func appConstructor(ap App) App {
 							file, header, err := r.FormFile(filename)
 							return file, header, err
 						},
+						Form: r.Form,
 					}
 
 					resp := toDo(requestObj)
@@ -783,6 +793,7 @@ func appConstructor(ap App) App {
 									file, header, err := r.FormFile(filename)
 									return file, header, err
 								},
+								Form: r.Form,
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -839,6 +850,7 @@ func appConstructor(ap App) App {
 							file, header, err := r.FormFile(filename)
 							return file, header, err
 						},
+						Form: r.Form,
 					}
 
 					resp := toDo(requestObj)
