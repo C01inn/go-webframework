@@ -26,15 +26,16 @@ type App struct {
 }
 
 type Req struct {
-	Method  string
-	Route   string
-	Params  map[string]string
-	Body    string
-	Props   map[string]string
-	W       http.ResponseWriter
-	R       *http.Request
-	GetFile func(filename string) (multipart.File, *multipart.FileHeader, error)
-	Form    map[string][]string
+	Method    string
+	Route     string
+	Params    map[string]string
+	Body      string
+	Props     map[string]string
+	W         http.ResponseWriter
+	R         *http.Request
+	GetFile   func(filename string) (multipart.File, *multipart.FileHeader, error)
+	Form      map[string][]string
+	AddHeader func(headerName, headerValue string)
 }
 
 type UrlResp struct {
@@ -185,6 +186,9 @@ func appConstructor(ap App) App {
 							W:      w,
 							R:      r,
 							Form:   r.Form,
+							AddHeader: func(headerName, headerValue string) {
+								w.Header().Set(headerName, headerValue)
+							},
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -226,6 +230,9 @@ func appConstructor(ap App) App {
 							W:      w,
 							R:      r,
 							Form:   r.Form,
+							AddHeader: func(headerName, headerValue string) {
+								w.Header().Set(headerName, headerValue)
+							},
 						}
 
 						resp := routeFunc[hashRoute](requestObj)
@@ -272,6 +279,9 @@ func appConstructor(ap App) App {
 						W:      w,
 						R:      r,
 						Form:   r.Form,
+						AddHeader: func(headerName, headerValue string) {
+							w.Header().Set(headerName, headerValue)
+						},
 					}
 
 					resp := toDo(requestObj)
@@ -362,6 +372,9 @@ func appConstructor(ap App) App {
 									return r.FormFile(filename)
 								},
 								Form: r.Form,
+								AddHeader: func(headerName, headerValue string) {
+									w.Header().Set(headerName, headerValue)
+								},
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -419,6 +432,9 @@ func appConstructor(ap App) App {
 							return file, header, err
 						},
 						Form: r.Form,
+						AddHeader: func(headerName, headerValue string) {
+							w.Header().Set(headerName, headerValue)
+						},
 					}
 
 					resp := toDo(requestObj)
@@ -506,6 +522,9 @@ func appConstructor(ap App) App {
 									return file, header, err
 								},
 								Form: r.Form,
+								AddHeader: func(headerName, headerValue string) {
+									w.Header().Set(headerName, headerValue)
+								},
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -563,6 +582,9 @@ func appConstructor(ap App) App {
 							return file, header, err
 						},
 						Form: r.Form,
+						AddHeader: func(headerName, headerValue string) {
+							w.Header().Set(headerName, headerValue)
+						},
 					}
 
 					resp := toDo(requestObj)
@@ -650,6 +672,9 @@ func appConstructor(ap App) App {
 									return file, header, err
 								},
 								Form: r.Form,
+								AddHeader: func(headerName, headerValue string) {
+									w.Header().Set(headerName, headerValue)
+								},
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -707,6 +732,9 @@ func appConstructor(ap App) App {
 							return file, header, err
 						},
 						Form: r.Form,
+						AddHeader: func(headerName, headerValue string) {
+							w.Header().Set(headerName, headerValue)
+						},
 					}
 
 					resp := toDo(requestObj)
@@ -794,6 +822,9 @@ func appConstructor(ap App) App {
 									return file, header, err
 								},
 								Form: r.Form,
+								AddHeader: func(headerName, headerValue string) {
+									w.Header().Set(headerName, headerValue)
+								},
 							}
 
 							resp := routeFunc[hashRoute](requestObj)
@@ -851,6 +882,9 @@ func appConstructor(ap App) App {
 							return file, header, err
 						},
 						Form: r.Form,
+						AddHeader: func(headerName, headerValue string) {
+							w.Header().Set(headerName, headerValue)
+						},
 					}
 
 					resp := toDo(requestObj)
@@ -1103,7 +1137,7 @@ func main() {
 	})
 
 	app.Get("/", func(req Req) UrlResp {
-
+		req.AddHeader("Access-Control-Allow-Origin", "***")
 		return RenderHtml("./templates/index.html", nil)
 	})
 
