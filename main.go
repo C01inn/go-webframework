@@ -43,9 +43,10 @@ type UrlResp struct {
 	contentType string
 	filename    string
 }
-
+// contains all the routes
 var allRoutes [][]string
-var routeFunc map[string]func(req Req) UrlResp
+// contains routes with their coresponding functions
+var routeFunc map[string]*(func(req Req) UrlResp)
 
 func removeIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
@@ -134,7 +135,7 @@ OUTER:
 
 func appConstructor(ap App) App {
 
-	routeFunc = make(map[string]func(req Req) UrlResp)
+	routeFunc = make(map[string]*(func(req Req) UrlResp))
 
 	// handle get request
 	ap.Get = func(route string, toDo func(req Req) UrlResp) {
@@ -143,14 +144,12 @@ func appConstructor(ap App) App {
 		if strings.HasPrefix(route, "/") {
 		} else {
 			panic("Route Must Start With a /")
-			return
 		}
 
 		// check if route already exists
 		for _, ccc := range allRoutes {
 			if ccc[0] == route {
 				panic("Route Already Exists")
-				return
 			} else {
 				continue
 			}
@@ -161,7 +160,7 @@ func appConstructor(ap App) App {
 		routeSlice = append(routeSlice, http.MethodGet)
 		allRoutes = append(allRoutes, routeSlice)
 
-		routeFunc[route] = toDo
+		routeFunc[route] = &toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 
@@ -190,8 +189,8 @@ func appConstructor(ap App) App {
 								w.Header().Set(headerName, headerValue)
 							},
 						}
-
-						resp := routeFunc[hashRoute](requestObj)
+ 
+						resp := (*routeFunc[hashRoute])(requestObj)
 
 						// check if user is returning html
 						if resp.contentType == "html" {
@@ -206,6 +205,8 @@ func appConstructor(ap App) App {
 						} else if resp.contentType == "download" {
 							w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 							http.ServeFile(w, r, resp.body)
+						} else if resp.contentType == "redirect" {
+							http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 						}
 					} else if routeMethod == r.Method && routeMethod != "GET" {
 						bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -235,7 +236,7 @@ func appConstructor(ap App) App {
 							},
 						}
 
-						resp := routeFunc[hashRoute](requestObj)
+						resp := (*routeFunc[hashRoute])(requestObj)
 						// check if user is returning html
 						if resp.contentType == "html" {
 							w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -249,6 +250,8 @@ func appConstructor(ap App) App {
 						} else if resp.contentType == "download" {
 							w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 							http.ServeFile(w, r, resp.body)
+						} else if resp.contentType == "redirect" {
+							http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 						}
 
 					} else {
@@ -299,6 +302,8 @@ func appConstructor(ap App) App {
 					} else if resp.contentType == "download" {
 						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "redirect" {
+						http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 					}
 				} else {
 					fmt.Fprintf(w, "Method not allowed")
@@ -316,14 +321,12 @@ func appConstructor(ap App) App {
 		if strings.HasPrefix(route, "/") {
 		} else {
 			panic("Route Must Start With a /")
-			return
 		}
 
 		// check if route already exists
 		for _, ccc := range allRoutes {
 			if ccc[0] == route {
 				panic("Route Already Exists")
-				return
 			} else {
 				continue
 			}
@@ -334,7 +337,7 @@ func appConstructor(ap App) App {
 		routeSlice1 = append(routeSlice1, http.MethodPost)
 		allRoutes = append(allRoutes, routeSlice1)
 
-		routeFunc[route] = toDo
+		routeFunc[route] = &toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
@@ -377,7 +380,7 @@ func appConstructor(ap App) App {
 								},
 							}
 
-							resp := routeFunc[hashRoute](requestObj)
+							resp := (*routeFunc[hashRoute])(requestObj)
 							// check if user is returning html
 							if resp.contentType == "html" {
 								w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -391,6 +394,8 @@ func appConstructor(ap App) App {
 							} else if resp.contentType == "download" {
 								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "redirect" {
+								http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 							}
 						} else {
 							// if not return wront method
@@ -451,6 +456,8 @@ func appConstructor(ap App) App {
 					} else if resp.contentType == "download" {
 						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "redirect" {
+						http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 					}
 				}
 
@@ -466,14 +473,12 @@ func appConstructor(ap App) App {
 		if strings.HasPrefix(route, "/") {
 		} else {
 			panic("Route Must Start With a /")
-			return
 		}
 
 		// check if route already exists
 		for _, ccc := range allRoutes {
 			if ccc[0] == route {
 				panic("Route Already Exists")
-				return
 			} else {
 				continue
 			}
@@ -484,7 +489,7 @@ func appConstructor(ap App) App {
 		routeSlice1 = append(routeSlice1, http.MethodPut)
 		allRoutes = append(allRoutes, routeSlice1)
 
-		routeFunc[route] = toDo
+		routeFunc[route] = &toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPut {
@@ -527,7 +532,7 @@ func appConstructor(ap App) App {
 								},
 							}
 
-							resp := routeFunc[hashRoute](requestObj)
+							resp := (*routeFunc[hashRoute])(requestObj)
 							// check if user is returning html
 							if resp.contentType == "html" {
 								w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -541,6 +546,8 @@ func appConstructor(ap App) App {
 							} else if resp.contentType == "download" {
 								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "redirect" {
+								http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 							}
 						} else {
 							// if not return wront method
@@ -601,6 +608,8 @@ func appConstructor(ap App) App {
 					} else if resp.contentType == "download" {
 						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "redirect" {
+						http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 					}
 				}
 
@@ -616,14 +625,12 @@ func appConstructor(ap App) App {
 		if strings.HasPrefix(route, "/") {
 		} else {
 			panic("Route Must Start With a /")
-			return
 		}
 
 		// check if route already exists
 		for _, ccc := range allRoutes {
 			if ccc[0] == route {
 				panic("Route Already Exists")
-				return
 			} else {
 				continue
 			}
@@ -634,7 +641,7 @@ func appConstructor(ap App) App {
 		routeSlice1 = append(routeSlice1, http.MethodDelete)
 		allRoutes = append(allRoutes, routeSlice1)
 
-		routeFunc[route] = toDo
+		routeFunc[route] = &toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodDelete {
@@ -677,7 +684,7 @@ func appConstructor(ap App) App {
 								},
 							}
 
-							resp := routeFunc[hashRoute](requestObj)
+							resp := (*routeFunc[hashRoute])(requestObj)
 							// check if user is returning html
 							if resp.contentType == "html" {
 								w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -691,6 +698,8 @@ func appConstructor(ap App) App {
 							} else if resp.contentType == "download" {
 								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "redirect" {
+								http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 							}
 						} else {
 							// if not return wront method
@@ -751,6 +760,8 @@ func appConstructor(ap App) App {
 					} else if resp.contentType == "download" {
 						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "redirect" {
+						http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 					}
 				}
 
@@ -766,14 +777,12 @@ func appConstructor(ap App) App {
 		if strings.HasPrefix(route, "/") {
 		} else {
 			panic("Route Must Start With a /")
-			return
 		}
 
 		// check if route already exists
 		for _, ccc := range allRoutes {
 			if ccc[0] == route {
 				panic("Route Already Exists")
-				return
 			} else {
 				continue
 			}
@@ -784,7 +793,7 @@ func appConstructor(ap App) App {
 		routeSlice1 = append(routeSlice1, http.MethodPatch)
 		allRoutes = append(allRoutes, routeSlice1)
 
-		routeFunc[route] = toDo
+		routeFunc[route] = &toDo
 
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPatch {
@@ -827,7 +836,7 @@ func appConstructor(ap App) App {
 								},
 							}
 
-							resp := routeFunc[hashRoute](requestObj)
+							resp := (*routeFunc[hashRoute])(requestObj)
 							// check if user is returning html
 							if resp.contentType == "html" {
 								w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -841,6 +850,8 @@ func appConstructor(ap App) App {
 							} else if resp.contentType == "download" {
 								w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 								http.ServeFile(w, r, resp.body)
+							} else if resp.contentType == "redirect" {
+								http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 							}
 						} else {
 							// if not return wront method
@@ -901,6 +912,8 @@ func appConstructor(ap App) App {
 					} else if resp.contentType == "download" {
 						w.Header().Set(`Content-Disposition`, fmt.Sprintf(`attachment; filename="%s"`, resp.filename))
 						http.ServeFile(w, r, resp.body)
+					} else if resp.contentType == "redirect" {
+						http.Redirect(w, r, resp.body, http.StatusMovedPermanently)
 					}
 				}
 
@@ -984,7 +997,7 @@ func RenderHtml(filepath string, temp_data interface{}) UrlResp {
 	}
 
 }
-
+// function for returning plain text
 func SendStr(bodyu string) UrlResp {
 	return_value := UrlResp{
 		body:        bodyu,
@@ -1127,8 +1140,17 @@ func RemoveCookie(request Req, name string) {
 	http.SetCookie(request.W, http_cookie)
 }
 
+func Redirect(url string) UrlResp {
+	respData := UrlResp{
+		body: url,
+		filename: "",
+		contentType: "redirect",
+	}
+	return respData
+}
+
+
 func main() {
-	fmt.Println(http.MethodPatch)
 	app := Server()
 	// routes
 	app.Post("/home/{id}", func(req Req) UrlResp {
@@ -1139,6 +1161,9 @@ func main() {
 	app.Get("/", func(req Req) UrlResp {
 		req.AddHeader("Access-Control-Allow-Origin", "***")
 		return RenderHtml("./templates/index.html", nil)
+	})
+	app.Get("/ree", func(req Req) UrlResp {
+		return Redirect("/")
 	})
 
 	app.Get("/about/{id}/{type}", func(req Req) UrlResp {
@@ -1194,22 +1219,32 @@ func main() {
 		return SendStr("image:   " + req.Props["id"])
 	})
 
-	app.Get("/agg", func(req Req) UrlResp {
+	app.Get("/news", func(req Req) UrlResp {
 
 		// make struct of data to pass to template
+		type newsPost struct {
+			Headline string
+			Body string
+		}
+
 		type newsAggPage struct {
 			Title string
 			News  string
 			Posts []string
+			Data newsPost
 		}
-
+		
 		data2 := newsAggPage{
 			Title: "",
 			News:  "Fake news!",
 			Posts: []string{"Post 1", "Post 2", "Post3"},
+			Data: newsPost{
+				Headline: "This is a headline",
+				Body: "This is a body",
+			},
 		}
 
-		return RenderHtml(`./templates/temp.html`, data2)
+		return SendJson(data2)
 	})
 	app.Get("/upload", func(req Req) UrlResp {
 		return RenderHtml(`./templates/upload.html`, nil)
